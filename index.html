@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en" id="htmlRoot">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Altitude — Guided Mountain Expeditions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sky1:#a9d3ff; --sky2:#ffe6c4; --sky3:#ffc29a;
+    --fg:#10233a;
+    --fg-soft:rgba(16,35,58,.7);
+    --fg-faint:rgba(16,35,58,.48);
+    --panel:rgba(255,255,255,.74);
+    --panel-line:rgba(16,35,58,.13);
+    --accent:#d6431f;
+    --accent-ink:#ffffff;
+    --m1:#c6d2ea; --m2:#8fa4cf; --m3:#4b6393;
+    --snow:rgba(255,255,255,.9);
+    --orb:#ffb347; --orb-glow:rgba(255,179,71,.55);
+    --stars-o:0; --cloud-o:.85;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  :root[data-mode="night"]{
+    --sky1:#040614; --sky2:#171545; --sky3:#4b2d6e;
+    --fg:#f2f4ff;
+    --fg-soft:rgba(242,244,255,.74);
+    --fg-faint:rgba(242,244,255,.5);
+    --panel:rgba(10,12,38,.68);
+    --panel-line:rgba(255,255,255,.15);
+    --accent:#ff8a5c;
+    --accent-ink:#1a0f2e;
+    --m1:#2b2b66; --m2:#1a1a46; --m3:#0c0c2a;
+    --snow:rgba(207,214,255,.4);
+    --orb:#e9edff; --orb-glow:rgba(190,200,255,.35);
+    --stars-o:1; --cloud-o:0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0; padding:0; height:100%; background:var(--sky2); color:var(--fg); overflow-x:hidden; transition:background .5s ease;}
+  html{scroll-snap-type:y mandatory; scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){ html{scroll-snap-type:none; scroll-behavior:auto;} }
+  body{font-family:'DM Sans', system-ui, sans-serif; -webkit-font-smoothing:antialiased; transition:color .4s ease;}
+  h1,h2,h3{font-family:'Big Shoulders Display', sans-serif; margin:0; font-weight:800; letter-spacing:.01em; line-height:1;}
+  a{color:inherit; text-decoration:none;}
+  p{margin:0;}
+  button{font-family:inherit;}
+  ::selection{background:var(--accent); color:var(--accent-ink);}
+
+  /* ===== fixed scene ===== */
+  .sky{position:fixed; inset:0; z-index:-5; background:linear-gradient(to bottom,var(--sky1) 0%,var(--sky2) 50%,var(--sky3) 100%); background-size:100% 200%; background-position:0% 100%; transition:background .6s ease;}
+  .stars{position:fixed; left:0; right:0; top:0; height:75%; z-index:-4; opacity:var(--stars-o); transition:opacity .6s ease; pointer-events:none;}
+  .star{position:absolute; width:2px; height:2px; border-radius:50%; background:#fff; animation:twinkle 4s ease-in-out infinite;}
+  @keyframes twinkle{0%,100%{opacity:.25;} 50%{opacity:1;}}
+  .orb{position:fixed; top:15%; right:14%; width:clamp(64px,9vw,112px); aspect-ratio:1; border-radius:50%; background:var(--orb); box-shadow:0 0 90px 34px var(--orb-glow); z-index:-4; transition:background .5s ease, box-shadow .5s ease;}
+  .clouds{position:fixed; inset:0; z-index:-3; opacity:var(--cloud-o); transition:opacity .6s ease; pointer-events:none; overflow:hidden;}
+  .cloud{position:absolute; left:0; height:56px; width:240px; border-radius:100px; background:#fff; filter:blur(7px); animation:cdrift 110s linear infinite;}
+  .cloud:nth-child(1){top:12%; animation-duration:120s; animation-delay:-30s;}
+  .cloud:nth-child(2){top:27%; width:320px; animation-duration:160s; animation-delay:-90s; opacity:.8;}
+  .cloud:nth-child(3){top:40%; width:200px; animation-duration:100s; animation-delay:-60s; opacity:.7;}
+  @keyframes cdrift{from{transform:translateX(-40vw);} to{transform:translateX(120vw);}}
+  .scene{position:fixed; left:0; right:0; bottom:0; height:56vh; z-index:-2; pointer-events:none; overflow:hidden;}
+  .scene svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible;}
+  .layer{will-change:transform;}
+  @media (prefers-reduced-motion: reduce){ .star,.cloud{animation:none;} }
+
+  /* ===== chrome ===== */
+  .brand{position:fixed; top:calc(20px + env(safe-area-inset-top,0px)); left:24px; z-index:60; font-family:'Big Shoulders Display'; font-weight:900; font-size:22px; letter-spacing:.06em;}
+  .brand b{color:var(--accent);}
+  .toolbar{position:fixed; top:calc(16px + env(safe-area-inset-top,0px)); right:20px; z-index:60; display:flex; gap:8px;}
+  .pill-btn{
+    background:var(--panel); border:1px solid var(--panel-line); color:var(--fg); border-radius:100px;
+    padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer;
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    transition:transform .2s ease, background .3s ease, color .3s ease;
+  }
+  .pill-btn:hover{transform:translateY(-2px);}
+
+  .meter{position:fixed; right:20px; top:22%; bottom:14%; width:60px; z-index:55; display:flex; flex-direction:column; align-items:flex-end;}
+  .meter-read{text-align:right; font-variant-numeric:tabular-nums; margin-bottom:12px;}
+  .meter-read small{display:block; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--fg-faint);}
+  .meter-read b{font-family:'Big Shoulders Display'; font-size:22px; font-weight:800; line-height:1; color:var(--fg);}
+  .meter-read i{font-style:normal; font-size:12px; color:var(--fg-soft); margin-left:2px;}
+  .meter-bar{position:relative; flex:1; width:2px; background:var(--panel-line); border-radius:2px; margin-right:3px;}
+  .meter-fill{position:absolute; top:0; left:0; width:100%; height:0%; background:var(--accent); border-radius:2px;}
+  .tick{position:absolute; right:-4px; width:10px; height:10px; border-radius:50%; border:2px solid var(--fg-faint); background:transparent; padding:0; cursor:pointer; transform:translateY(-50%); transition:background .25s ease, border-color .25s ease, transform .25s ease;}
+  .tick.active{background:var(--accent); border-color:var(--accent); transform:translateY(-50%) scale(1.25);}
+  @media (max-width:700px){
+    .meter{top:auto; bottom:calc(16px + env(safe-area-inset-bottom,0px)); right:16px; width:auto; flex-direction:row; align-items:center;}
+    .meter-bar,.tick{display:none;}
+    .meter-read{margin:0; background:var(--panel); border:1px solid var(--panel-line); border-radius:100px; padding:6px 14px; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);}
+    .meter-read small{display:inline; margin-right:8px;}
+    .meter-read b{font-size:18px;}
+  }
+
+  section{
+    min-height:100vh; min-height:100svh; scroll-snap-align:start; position:relative;
+    display:flex; flex-direction:column; justify-content:center;
+    padding:calc(84px + env(safe-area-inset-top,0px)) 28px calc(56px + env(safe-area-inset-bottom,0px));
+  }
+  .wrap{max-width:1000px; margin:0 auto; width:100%;}
+  .eyebrow{font-size:12.5px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.12em;}
+  .head{margin-bottom:34px;}
+  .head h2{font-size:clamp(38px,6vw,64px); margin-top:8px;}
+
+  .rv{opacity:0; transform:translateY(28px); transition:opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1);}
+  .rv.in{opacity:1; transform:none;}
+  .rv-l{opacity:0; transform:translateX(-40px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.7,.3,1);}
+  .rv-l.in{opacity:1; transform:none;}
+  .rv-sc{opacity:0; transform:scale(.9); transition:opacity .6s ease, transform .6s cubic-bezier(.2,.8,.3,1);}
+  .rv-sc.in{opacity:1; transform:none;}
+  .d1{transition-delay:.08s;} .d2{transition-delay:.16s;} .d3{transition-delay:.24s;} .d4{transition-delay:.32s;}
+  @media (prefers-reduced-motion: reduce){ .rv,.rv-l,.rv-sc{transition:opacity .3s ease; transform:none;} }
+
+  .panel{background:var(--panel); border:1px solid var(--panel-line); border-radius:22px; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); transition:background .4s ease, border-color .4s ease;}
+
+  /* ===== 1 hero ===== */
+  #s1{padding-bottom:calc(24vh + env(safe-area-inset-bottom,0px));}
+  .hero{text-align:center;}
+  .hero-title{font-size:clamp(70px,19vw,230px); font-weight:900; letter-spacing:.03em; line-height:.9; margin-top:14px; display:flex; justify-content:center;}
+  .hero-title .ch{display:inline-block; opacity:0; transform:translateY(70%) rotate(6deg); transition:opacity .6s ease, transform .8s cubic-bezier(.16,.84,.24,1);}
+  .hero-title.in .ch{opacity:1; transform:none;}
+  .hero-tag{margin:22px auto 0; max-width:44ch; font-size:clamp(15px,2vw,18px); line-height:1.55; color:var(--fg-soft); font-weight:500;}
+  .hero-cta{margin-top:30px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;}
+  .btn{padding:14px 26px; border-radius:100px; font-weight:700; font-size:14px; display:inline-block; cursor:pointer; border:1px solid transparent; transition:transform .2s ease, box-shadow .2s ease, background .3s ease;}
+  .btn:hover{transform:translateY(-3px);}
+  .btn-solid{background:var(--accent); color:var(--accent-ink); box-shadow:0 12px 28px -14px var(--accent);}
+  .btn-ghost{background:var(--panel); border-color:var(--panel-line); color:var(--fg); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);}
+  .scroll-cue{position:absolute; bottom:calc(20px + env(safe-area-inset-bottom,0px)); left:0; right:0; text-align:center; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--fg-soft); font-weight:600;}
+  .scroll-cue span{display:inline-block; margin-left:6px; animation:bob 1.8s ease-in-out infinite;}
+  @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(5px);}}
+  @media (prefers-reduced-motion: reduce){ .scroll-cue span{animation:none;} }
+
+  /* ===== 2 expeditions ===== */
+  .cards{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+  @media (max-width:860px){ .cards{grid-template-columns:1fr;} }
+  .card{padding:24px; display:flex; flex-direction:column; gap:10px; transition:transform .3s cubic-bezier(.2,.8,.3,1), border-color .3s ease;}
+  .card:hover{transform:translateY(-6px); border-color:var(--accent);}
+  .peak-icon{width:40px; height:30px; color:var(--accent);}
+  .card h3{font-size:34px;}
+  .card .place{font-size:12.5px; font-weight:700; color:var(--fg-faint); text-transform:uppercase; letter-spacing:.08em;}
+  .card .meta{font-size:13.5px; color:var(--fg-soft); font-weight:600;}
+  .card .desc{font-size:14px; line-height:1.55; color:var(--fg-soft);}
+  .card .price{margin-top:auto; padding-top:10px; font-family:'Big Shoulders Display'; font-weight:800; font-size:26px; color:var(--fg); border-top:1px solid var(--panel-line);}
+
+  /* ===== 3 why ===== */
+  .why{padding:36px;}
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:20px;}
+  @media (max-width:760px){ .stats{grid-template-columns:repeat(2,1fr);} .why{padding:24px;} }
+  .stat h3{font-size:clamp(46px,7vw,76px); font-weight:900; color:var(--fg); font-variant-numeric:tabular-nums;}
+  .stat p{margin-top:6px; font-size:13.5px; color:var(--fg-soft); font-weight:500;}
+  .chips{margin-top:30px; padding-top:24px; border-top:1px solid var(--panel-line); display:flex; gap:10px; flex-wrap:wrap;}
+  .chip{font-size:13px; font-weight:600; padding:9px 16px; border-radius:100px; border:1px solid var(--panel-line); color:var(--fg);}
+
+  /* ===== 4 journey ===== */
+  .journey{padding:34px 34px 30px;}
+  .trail-wrap{width:100%;}
+  .trail-wrap svg{width:100%; height:auto; display:block; overflow:visible;}
+  .trail{fill:none; stroke:var(--accent); stroke-width:4; stroke-linecap:round; stroke-linejoin:round;}
+  .trail-bg{fill:none; stroke:var(--panel-line); stroke-width:4; stroke-linecap:round; stroke-dasharray:2 10;}
+  .wp{fill:var(--panel); stroke:var(--accent); stroke-width:4; transform-box:fill-box; transform-origin:center; transform:scale(0); transition:transform .5s cubic-bezier(.3,1.5,.5,1);}
+  .trail-wrap.in .wp{transform:scale(1);}
+  .trail-wrap.in .wp:nth-of-type(1){transition-delay:.5s;} .trail-wrap.in .wp:nth-of-type(2){transition-delay:1s;} .trail-wrap.in .wp:nth-of-type(3){transition-delay:1.5s;} .trail-wrap.in .wp:nth-of-type(4){transition-delay:2s;}
+  .flag{fill:var(--accent); opacity:0; transition:opacity .5s ease 2.2s;}
+  .trail-wrap.in .flag{opacity:1;}
+  .steps4{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:8px;}
+  @media (max-width:760px){ .steps4{grid-template-columns:repeat(2,1fr);} }
+  .st .day{font-family:'Big Shoulders Display'; font-weight:800; font-size:22px; color:var(--accent);}
+  .st h4{margin:4px 0 0; font-size:14.5px; font-weight:700;}
+  .st p{margin-top:5px; font-size:13px; color:var(--fg-soft); line-height:1.5;}
+
+  /* ===== 5 book ===== */
+  .book{padding:34px;}
+  .dep{display:grid; grid-template-columns:90px 1fr auto; gap:16px; align-items:center; padding:16px 0; border-top:1px solid var(--panel-line);}
+  .dep:first-child{border-top:none; padding-top:0;}
+  .dep .date{font-family:'Big Shoulders Display'; font-weight:800; font-size:24px;}
+  .dep .route{font-weight:600; font-size:15.5px;}
+  .dep .spots{font-size:12.5px; font-weight:700; color:var(--accent); white-space:nowrap;}
+  .book-cta{margin-top:22px; padding-top:22px; border-top:1px solid var(--panel-line); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  .book-cta .mail{font-size:13.5px; color:var(--fg-soft); font-weight:600;}
+  footer{margin-top:22px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12px; color:var(--fg-soft); font-weight:500;}
+  @media (max-width:560px){ .dep{grid-template-columns:70px 1fr;} .dep .spots{grid-column:2;} }
+</style>
+</head>
+<body>
+
+<div class="sky" id="sky"></div>
+<div class="stars" id="stars"></div>
+<div class="orb" id="orb"></div>
+<div class="clouds"><span class="cloud"></span><span class="cloud"></span><span class="cloud"></span></div>
+<div class="scene" aria-hidden="true">
+  <svg viewBox="0 0 1440 600" preserveAspectRatio="xMidYMax slice">
+    <g class="layer" id="l1">
+      <path style="fill:var(--m1)" d="M0 420 L120 330 L210 390 L330 280 L450 380 L560 300 L700 400 L820 260 L940 370 L1060 300 L1180 390 L1300 320 L1440 400 L1440 700 L0 700 Z"/>
+      <path style="fill:var(--snow)" d="M330 280 L305 306 L322 298 L338 310 L352 300 Z M820 260 L790 292 L808 284 L824 298 L842 288 Z M560 300 L540 320 L554 314 L566 324 L578 316 Z"/>
+    </g>
+    <g class="layer" id="l2">
+      <path style="fill:var(--m2)" d="M0 470 L100 400 L220 450 L360 340 L480 450 L600 380 L740 470 L880 330 L1010 450 L1150 390 L1290 460 L1440 410 L1440 700 L0 700 Z"/>
+      <path style="fill:var(--snow)" d="M360 340 L338 364 L352 358 L366 368 L382 358 Z M880 330 L856 356 L870 350 L884 362 L902 350 Z"/>
+    </g>
+    <g class="layer" id="l3">
+      <path style="fill:var(--m3)" d="M0 540 L140 470 L260 520 L400 430 L540 530 L680 470 L820 540 L960 450 L1100 530 L1240 480 L1440 540 L1440 700 L0 700 Z"/>
+    </g>
+  </svg>
+</div>
+
+<div class="brand">ALTITUDE<b>▲</b></div>
+<div class="toolbar">
+  <button class="pill-btn" id="langBtn">RU</button>
+  <button class="pill-btn" id="modeBtn" data-i18n="modeToNight">Night</button>
+</div>
+
+<div class="meter" id="meter">
+  <div class="meter-read"><small data-i18n="altLabel">Altitude</small><b id="altVal">0</b><i id="altUnit">m</i></div>
+  <div class="meter-bar">
+    <div class="meter-fill" id="meterFill"></div>
+    <button class="tick active" style="top:0%" data-go="s1" aria-label="1"></button>
+    <button class="tick" style="top:25%" data-go="s2" aria-label="2"></button>
+    <button class="tick" style="top:50%" data-go="s3" aria-label="3"></button>
+    <button class="tick" style="top:75%" data-go="s4" aria-label="4"></button>
+    <button class="tick" style="top:100%" data-go="s5" aria-label="5"></button>
+  </div>
+</div>
+
+<!-- 1 HERO -->
+<section id="s1">
+  <div class="wrap hero">
+    <p class="eyebrow rv" data-i18n="heroEyebrow">Guided mountain expeditions</p>
+    <h1 class="hero-title" id="heroTitle" aria-label="Altitude"></h1>
+    <p class="hero-tag rv d2" data-i18n="heroTag">Six peaks. Small groups. One rule: nobody climbs alone.</p>
+    <div class="hero-cta rv d3">
+      <a class="btn btn-solid" data-go="s2" data-i18n="ctaExp">See expeditions</a>
+      <a class="btn btn-ghost" data-go="s5" data-i18n="ctaBook">Book a spot</a>
+    </div>
+  </div>
+  <div class="scroll-cue"><span data-i18n="scrollCue">Scroll to climb</span><span>↓</span></div>
+</section>
+
+<!-- 2 EXPEDITIONS -->
+<section id="s2">
+  <div class="wrap">
+    <div class="head rv">
+      <span class="eyebrow" data-i18n="expEyebrow">Expeditions</span>
+      <h2 data-i18n="expHeading">Pick your mountain.</h2>
+    </div>
+    <div class="cards">
+      <div class="card panel rv-l">
+        <svg class="peak-icon" viewBox="0 0 40 30"><path d="M2 28 L16 6 L23 17 L28 10 L38 28 Z" fill="currentColor"/></svg>
+        <span class="place" data-i18n="c1place">Nepal</span>
+        <h3>Annapurna Circuit</h3>
+        <p class="meta" data-i18n="c1meta">16 days · Moderate</p>
+        <p class="desc" data-i18n="c1desc">Rice terraces to the 5,416 m Thorong La pass.</p>
+        <p class="price" data-i18n="c1price">from $2,900</p>
+      </div>
+      <div class="card panel rv d2">
+        <svg class="peak-icon" viewBox="0 0 40 30"><path d="M2 28 L16 6 L23 17 L28 10 L38 28 Z" fill="currentColor"/></svg>
+        <span class="place" data-i18n="c2place">France · Italy · Switzerland</span>
+        <h3>Mont Blanc Tour</h3>
+        <p class="meta" data-i18n="c2meta">9 days · Challenging</p>
+        <p class="desc" data-i18n="c2desc">Glaciers, mountain huts and three countries on foot.</p>
+        <p class="price" data-i18n="c2price">from $2,400</p>
+      </div>
+      <div class="card panel rv-l d4" style="--dir:1;">
+        <svg class="peak-icon" viewBox="0 0 40 30"><path d="M2 28 L16 6 L23 17 L28 10 L38 28 Z" fill="currentColor"/></svg>
+        <span class="place" data-i18n="c3place">Tanzania</span>
+        <h3>Kilimanjaro</h3>
+        <p class="meta" data-i18n="c3meta">8 days · Challenging</p>
+        <p class="desc" data-i18n="c3desc">Africa's roof via the quieter Lemosho route.</p>
+        <p class="price" data-i18n="c3price">from $3,300</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 WHY -->
+<section id="s3">
+  <div class="wrap">
+    <div class="head rv">
+      <span class="eyebrow" data-i18n="whyEyebrow">Why Altitude</span>
+      <h2 data-i18n="whyHeading">Built around safety, not summits.</h2>
+    </div>
+    <div class="why panel rv-sc d1">
+      <div class="stats">
+        <div class="stat"><h3 data-count="14" data-suffix="">0</h3><p data-i18n="stat1">years guiding</p></div>
+        <div class="stat"><h3 data-count="2300" data-suffix="+">0</h3><p data-i18n="stat2">climbers guided</p></div>
+        <div class="stat"><h3 data-count="96" data-suffix="%">0</h3><p data-i18n="stat3">reached their goal</p></div>
+        <div class="stat"><h3 data-count="8" data-suffix="">0</h3><p data-i18n="stat4">max group size</p></div>
+      </div>
+      <div class="chips">
+        <span class="chip" data-i18n="chip1">Certified guides</span>
+        <span class="chip" data-i18n="chip2">Oxygen and sat-phone on every trip</span>
+        <span class="chip" data-i18n="chip3">Acclimatization built in</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 JOURNEY -->
+<section id="s4">
+  <div class="wrap">
+    <div class="head rv">
+      <span class="eyebrow" data-i18n="jEyebrow">Your journey</span>
+      <h2 data-i18n="jHeading">Day by day to the top.</h2>
+    </div>
+    <div class="journey panel rv-sc d1">
+      <div class="trail-wrap" id="trailWrap">
+        <svg viewBox="0 0 800 280" aria-hidden="true">
+          <path class="trail-bg" d="M20 250 C60 240 70 205 100 200 S190 232 230 200 S270 158 300 150 S380 172 420 132 S470 118 500 110 S580 132 620 88 S670 62 700 52 S760 40 780 26"/>
+          <path class="trail" id="trailPath" d="M20 250 C60 240 70 205 100 200 S190 232 230 200 S270 158 300 150 S380 172 420 132 S470 118 500 110 S580 132 620 88 S670 62 700 52 S760 40 780 26"/>
+          <circle class="wp" cx="100" cy="200" r="9"/>
+          <circle class="wp" cx="300" cy="150" r="9"/>
+          <circle class="wp" cx="500" cy="110" r="9"/>
+          <circle class="wp" cx="700" cy="52" r="9"/>
+          <path class="flag" d="M780 26 L780 -6 L806 4 L780 14 Z"/>
+        </svg>
+      </div>
+      <div class="steps4">
+        <div class="st rv d1"><div class="day" data-i18n="day1">Day 1</div><h4 data-i18n="j1h">Arrive and gear check</h4><p data-i18n="j1p">Meet your guides, check every strap.</p></div>
+        <div class="st rv d2"><div class="day" data-i18n="day4">Day 4</div><h4 data-i18n="j2h">Acclimatization hike</h4><p data-i18n="j2p">Climb high, sleep low.</p></div>
+        <div class="st rv d3"><div class="day" data-i18n="day9">Day 9</div><h4 data-i18n="j3h">High camp</h4><p data-i18n="j3p">Final rest before the push.</p></div>
+        <div class="st rv d4"><div class="day" data-i18n="day12">Day 12</div><h4 data-i18n="j4h">Summit push</h4><p data-i18n="j4p">Alpine start, summit by sunrise.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 BOOK -->
+<section id="s5">
+  <div class="wrap">
+    <div class="head rv">
+      <span class="eyebrow" data-i18n="bEyebrow">Book</span>
+      <h2 data-i18n="bHeading">Next departures fill up fast.</h2>
+    </div>
+    <div class="book panel rv-sc d1">
+      <div class="dep"><span class="date" data-i18n="dd1">Oct 12</span><span class="route">Annapurna Circuit</span><span class="spots" data-i18n="sp1">3 spots left</span></div>
+      <div class="dep"><span class="date" data-i18n="dd2">Nov 2</span><span class="route">Annapurna Circuit</span><span class="spots" data-i18n="sp2">6 spots left</span></div>
+      <div class="dep"><span class="date" data-i18n="dd3">Jan 18</span><span class="route">Kilimanjaro</span><span class="spots" data-i18n="sp3">5 spots left</span></div>
+      <div class="dep"><span class="date" data-i18n="dd4">Jun 20</span><span class="route">Mont Blanc Tour</span><span class="spots" data-i18n="sp4">Waitlist open</span></div>
+      <div class="book-cta">
+        <a class="btn btn-solid" href="mailto:trips@altitude.example" data-i18n="ctaMail">Book a spot</a>
+        <span class="mail">trips@altitude.example</span>
+      </div>
+      <footer>
+        <span>© 2026 Altitude Expeditions</span>
+        <span data-i18n="footTag">Small groups. Big mountains.</span>
+      </footer>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  var dict = {
+    modeToNight:{en:"Night",ru:"Ночь"}, modeToDay:{en:"Day",ru:"День"},
+    altLabel:{en:"Altitude",ru:"Высота"},
+    heroEyebrow:{en:"Guided mountain expeditions",ru:"Экспедиции в горы с гидами"},
+    heroTag:{en:"Six peaks. Small groups. One rule: nobody climbs alone.",ru:"Шесть вершин. Малые группы. Одно правило: никто не идёт один."},
+    ctaExp:{en:"See expeditions",ru:"Смотреть экспедиции"}, ctaBook:{en:"Book a spot",ru:"Забронировать место"},
+    scrollCue:{en:"Scroll to climb",ru:"Листайте, чтобы подниматься"},
+    expEyebrow:{en:"Expeditions",ru:"Экспедиции"}, expHeading:{en:"Pick your mountain.",ru:"Выберите свою гору."},
+    c1place:{en:"Nepal",ru:"Непал"}, c1meta:{en:"16 days · Moderate",ru:"16 дней · средняя сложность"},
+    c1desc:{en:"Rice terraces to the 5,416 m Thorong La pass.",ru:"От рисовых террас до перевала Торонг-Ла, 5 416 м."}, c1price:{en:"from $2,900",ru:"от $2 900"},
+    c2place:{en:"France · Italy · Switzerland",ru:"Франция · Италия · Швейцария"}, c2meta:{en:"9 days · Challenging",ru:"9 дней · высокая сложность"},
+    c2desc:{en:"Glaciers, mountain huts and three countries on foot.",ru:"Ледники, горные приюты и три страны пешком."}, c2price:{en:"from $2,400",ru:"от $2 400"},
+    c3place:{en:"Tanzania",ru:"Танзания"}, c3meta:{en:"8 days · Challenging",ru:"8 дней · высокая сложность"},
+    c3desc:{en:"Africa's roof via the quieter Lemosho route.",ru:"Крыша Африки по тихому маршруту Лемошо."}, c3price:{en:"from $3,300",ru:"от $3 300"},
+    whyEyebrow:{en:"Why Altitude",ru:"Почему Altitude"}, whyHeading:{en:"Built around safety, not summits.",ru:"Безопасность важнее вершины."},
+    stat1:{en:"years guiding",ru:"лет проводим экспедиции"}, stat2:{en:"climbers guided",ru:"человек проведено"},
+    stat3:{en:"reached their goal",ru:"дошли до цели"}, stat4:{en:"max group size",ru:"человек в группе максимум"},
+    chip1:{en:"Certified guides",ru:"Сертифицированные гиды"}, chip2:{en:"Oxygen and sat-phone on every trip",ru:"Кислород и спутниковый телефон в каждой поездке"},
+    chip3:{en:"Acclimatization built in",ru:"Акклиматизация в программе"},
+    jEyebrow:{en:"Your journey",ru:"Ваш путь"}, jHeading:{en:"Day by day to the top.",ru:"День за днём — к вершине."},
+    day1:{en:"Day 1",ru:"День 1"}, day4:{en:"Day 4",ru:"День 4"}, day9:{en:"Day 9",ru:"День 9"}, day12:{en:"Day 12",ru:"День 12"},
+    j1h:{en:"Arrive and gear check",ru:"Прилёт и проверка снаряжения"}, j1p:{en:"Meet your guides, check every strap.",ru:"Знакомство с гидами, проверка каждого крепления."},
+    j2h:{en:"Acclimatization hike",ru:"Акклиматизационный выход"}, j2p:{en:"Climb high, sleep low.",ru:"Поднимаемся высоко, ночуем ниже."},
+    j3h:{en:"High camp",ru:"Высотный лагерь"}, j3p:{en:"Final rest before the push.",ru:"Последний отдых перед штурмом."},
+    j4h:{en:"Summit push",ru:"Штурм вершины"}, j4p:{en:"Alpine start, summit by sunrise.",ru:"Выход затемно, вершина к рассвету."},
+    bEyebrow:{en:"Book",ru:"Бронирование"}, bHeading:{en:"Next departures fill up fast.",ru:"Ближайшие выезды разбирают быстро."},
+    dd1:{en:"Oct 12",ru:"12 окт"}, dd2:{en:"Nov 2",ru:"2 ноя"}, dd3:{en:"Jan 18",ru:"18 янв"}, dd4:{en:"Jun 20",ru:"20 июн"},
+    sp1:{en:"3 spots left",ru:"осталось 3 места"}, sp2:{en:"6 spots left",ru:"осталось 6 мест"}, sp3:{en:"5 spots left",ru:"осталось 5 мест"}, sp4:{en:"Waitlist open",ru:"лист ожидания открыт"},
+    ctaMail:{en:"Book a spot",ru:"Забронировать место"}, footTag:{en:"Small groups. Big mountains.",ru:"Малые группы. Большие горы."}
+  };
+
+  var root = document.documentElement;
+  var langBtn = document.getElementById('langBtn');
+  var modeBtn = document.getElementById('modeBtn');
+  var altUnit = document.getElementById('altUnit');
+  var currentLang = 'en';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var savedLang = null, savedMode = null;
+  try { savedLang = localStorage.getItem('alt-lang'); } catch(e) {}
+  try { savedMode = localStorage.getItem('alt-mode'); } catch(e) {}
+
+  function loc(){ return currentLang === 'ru' ? 'ru-RU' : 'en-US'; }
+  function applyLang(lang){
+    currentLang = lang;
+    root.setAttribute('lang', lang);
+    langBtn.textContent = (lang === 'en') ? 'RU' : 'EN';
+    altUnit.textContent = (lang === 'ru') ? 'м' : 'm';
+    document.querySelectorAll('[data-i18n]').forEach(function(el){
+      var k = el.getAttribute('data-i18n');
+      if (dict[k]) el.textContent = dict[k][lang];
+    });
+    var night = root.getAttribute('data-mode') === 'night';
+    modeBtn.textContent = dict[night ? 'modeToDay' : 'modeToNight'][lang];
+    updateScene();
+  }
+  function applyMode(mode){
+    if (mode === 'night') root.setAttribute('data-mode','night'); else root.removeAttribute('data-mode');
+    modeBtn.textContent = dict[mode === 'night' ? 'modeToDay' : 'modeToNight'][currentLang];
+  }
+
+  /* stars */
+  var starsEl = document.getElementById('stars');
+  for (var i = 0; i < 90; i++){
+    var s = document.createElement('span');
+    s.className = 'star';
+    s.style.left = (Math.random()*100) + '%';
+    s.style.top = (Math.random()*100) + '%';
+    var size = Math.random() < .15 ? 3 : 2;
+    s.style.width = s.style.height = size + 'px';
+    s.style.animationDelay = (-Math.random()*5) + 's';
+    s.style.animationDuration = (3 + Math.random()*4) + 's';
+    starsEl.appendChild(s);
+  }
+
+  /* hero title letters */
+  var heroTitle = document.getElementById('heroTitle');
+  'ALTITUDE'.split('').forEach(function(ch, idx){
+    var sp = document.createElement('span');
+    sp.className = 'ch'; sp.textContent = ch;
+    sp.style.transitionDelay = (reduced ? 0 : idx * 70) + 'ms';
+    heroTitle.appendChild(sp);
+  });
+
+  /* scene + meter */
+  var sky = document.getElementById('sky'), orb = document.getElementById('orb');
+  var l1 = document.getElementById('l1'), l2 = document.getElementById('l2'), l3 = document.getElementById('l3');
+  var meterFill = document.getElementById('meterFill'), altVal = document.getElementById('altVal');
+  var ticks = document.querySelectorAll('.tick');
+  var ticking = false;
+  function updateScene(){
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - doc.clientHeight;
+    var y = window.pageYOffset || doc.scrollTop || 0;
+    var p = max > 0 ? Math.max(0, Math.min(1, y / max)) : 0;
+    if (!reduced){
+      l1.style.transform = 'translate3d(0,' + (p*50) + 'px,0)';
+      l2.style.transform = 'translate3d(0,' + (p*110) + 'px,0)';
+      l3.style.transform = 'translate3d(0,' + (p*180) + 'px,0)';
+      orb.style.transform = 'translate3d(0,' + (-p*150) + 'px,0)';
+      sky.style.backgroundPosition = '0% ' + (100 - p*100) + '%';
+    }
+    meterFill.style.height = (p*100) + '%';
+    altVal.textContent = (Math.round(p*640)*10).toLocaleString(loc());
+    var idx = Math.round(p*4);
+    ticks.forEach(function(t, i){ t.classList.toggle('active', i === idx); });
+  }
+  window.addEventListener('scroll', function(){
+    if (!ticking){ ticking = true; requestAnimationFrame(function(){ updateScene(); ticking = false; }); }
+  }, { passive:true });
+  window.addEventListener('resize', updateScene);
+
+  /* reveal both directions */
+  var revealEls = document.querySelectorAll('.rv, .rv-l, .rv-sc');
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ e.target.classList.toggle('in', e.isIntersecting); });
+  }, { threshold:0.2 });
+  revealEls.forEach(function(el){ io.observe(el); });
+  var titleObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ heroTitle.classList.toggle('in', e.isIntersecting); });
+  }, { threshold:0.3 });
+  titleObs.observe(heroTitle);
+
+  /* trail drawing */
+  var trailWrap = document.getElementById('trailWrap');
+  var trailPath = document.getElementById('trailPath');
+  var trailLen = trailPath.getTotalLength();
+  trailPath.style.strokeDasharray = trailLen;
+  trailPath.style.strokeDashoffset = trailLen;
+  var trailObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if (e.isIntersecting){
+        trailWrap.classList.add('in');
+        trailPath.style.transition = reduced ? 'none' : 'stroke-dashoffset 2.4s cubic-bezier(.4,.1,.2,1)';
+        trailPath.style.strokeDashoffset = 0;
+      } else {
+        trailWrap.classList.remove('in');
+        trailPath.style.transition = 'none';
+        trailPath.style.strokeDashoffset = trailLen;
+      }
+    });
+  }, { threshold:0.4 });
+  trailObs.observe(trailWrap);
+
+  /* counters replay */
+  var statEls = document.querySelectorAll('.stat h3');
+  var timers = new WeakMap();
+  function animateStat(el, entering){
+    var target = parseFloat(el.getAttribute('data-count')) || 0;
+    var suffix = el.getAttribute('data-suffix') || '';
+    if (timers.has(el)) cancelAnimationFrame(timers.get(el));
+    if (!entering){ el.textContent = '0' + suffix; return; }
+    if (reduced){ el.textContent = target.toLocaleString(loc()) + suffix; return; }
+    var start = null, dur = 1400;
+    function step(ts){
+      if (!start) start = ts;
+      var p = Math.min((ts - start)/dur, 1), eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target*eased).toLocaleString(loc()) + suffix;
+      if (p < 1) timers.set(el, requestAnimationFrame(step));
+    }
+    timers.set(el, requestAnimationFrame(step));
+  }
+  var statObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ animateStat(e.target, e.isIntersecting); });
+  }, { threshold:0.5 });
+  statEls.forEach(function(el){ statObs.observe(el); });
+
+  /* navigation */
+  document.querySelectorAll('[data-go]').forEach(function(el){
+    el.addEventListener('click', function(e){
+      e.preventDefault();
+      var t = document.getElementById(el.getAttribute('data-go'));
+      if (t) t.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+    });
+  });
+
+  /* toggles */
+  langBtn.addEventListener('click', function(){
+    var next = currentLang === 'en' ? 'ru' : 'en';
+    applyLang(next);
+    try { localStorage.setItem('alt-lang', next); } catch(e) {}
+  });
+  modeBtn.addEventListener('click', function(){
+    var next = root.getAttribute('data-mode') === 'night' ? 'day' : 'night';
+    applyMode(next);
+    try { localStorage.setItem('alt-mode', next); } catch(e) {}
+  });
+
+  applyMode(savedMode === 'night' ? 'night' : 'day');
+  applyLang(savedLang === 'ru' ? 'ru' : 'en');
+})();
+</script>
+</body>
+</html>
